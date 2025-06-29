@@ -1,9 +1,13 @@
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Shield, Wifi, ArrowLeft } from "lucide-react";
+import { Shield, Wifi, ArrowLeft, LogOut } from "lucide-react";
 
-const AdminHeader = () => {
+interface AdminHeaderProps {
+  onLogout?: () => void;
+}
+
+const AdminHeader = ({ onLogout }: AdminHeaderProps) => {
   return (
     <div className="bg-white shadow-sm border-b">
       <div className="container mx-auto px-4 py-4">
@@ -28,6 +32,12 @@ const AdminHeader = () => {
                 <span>Back to Portal</span>
               </a>
             </Button>
+            {onLogout && (
+              <Button variant="outline" size="sm" onClick={onLogout}>
+                <LogOut className="h-4 w-4 mr-2" />
+                <span>Logout</span>
+              </Button>
+            )}
           </div>
         </div>
       </div>

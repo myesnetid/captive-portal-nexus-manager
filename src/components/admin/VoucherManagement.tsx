@@ -5,7 +5,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
@@ -15,7 +14,6 @@ import {
   Plus, 
   Printer, 
   Download, 
-  Calendar,
   Filter,
   Trash2,
   Copy
@@ -25,7 +23,8 @@ const VoucherManagement = () => {
   const [selectedDuration, setSelectedDuration] = useState("");
   const [bulkCount, setBulkCount] = useState(1);
   const [comment, setComment] = useState("");
-  const [selectedCommentFilter, setSelectedCommentFilter] = useState("");
+  const [selectedCommentFilter, setSelectedCommentFilter] = useState("all");
+  const [selectedStatusFilter, setSelectedStatusFilter] = useState("all");
   const { toast } = useToast();
 
   // Mock data
@@ -112,6 +111,12 @@ const VoucherManagement = () => {
       description: `Mencetak voucher dengan comment: ${comment}`,
     });
   };
+
+  const filteredVouchers = vouchers.filter(voucher => {
+    const commentMatch = selectedCommentFilter === "all" || voucher.comment === selectedCommentFilter;
+    const statusMatch = selectedStatusFilter === "all" || voucher.status === selectedStatusFilter;
+    return commentMatch && statusMatch;
+  });
 
   return (
     <div className="space-y-6">
@@ -250,7 +255,7 @@ const VoucherManagement = () => {
                   <SelectValue placeholder="Pilih comment" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Semua Comment</SelectItem>
+                  <SelectItem value="all">Semua Comment</SelectItem>
                   {existingComments.map((comment) => (
                     <SelectItem key={comment} value={comment}>
                       {comment}
@@ -261,7 +266,7 @@ const VoucherManagement = () => {
             </div>
             <div className="space-y-2">
               <Label>Status</Label>
-              <Select>
+              <Select value={selectedStatusFilter} onValueChange={setSelectedStatusFilter}>
                 <SelectTrigger>
                   <SelectValue placeholder="Semua Status" />
                 </SelectTrigger>
@@ -276,7 +281,7 @@ const VoucherManagement = () => {
               <Button 
                 onClick={() => handlePrintVouchers(selectedCommentFilter)}
                 className="w-full bg-green-600 hover:bg-green-700"
-                disabled={!selectedCommentFilter}
+                disabled={selectedCommentFilter === "all"}
               >
                 <Printer className="h-4 w-4 mr-2" />
                 Print by Comment
@@ -305,9 +310,7 @@ const VoucherManagement = () => {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {vouchers
-                .filter(v => !selectedCommentFilter || v.comment === selectedCommentFilter)
-                .map((voucher) => (
+              {filteredVouchers.map((voucher) => (
                 <TableRow key={voucher.id}>
                   <TableCell className="font-mono font-bold">{voucher.code}</TableCell>
                   <TableCell>{voucher.type}</TableCell>

@@ -1,9 +1,8 @@
 
 import { useState } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Button } from "@/components/ui/button";
 import AdminHeader from "@/components/admin/AdminHeader";
+import AdminLogin from "@/components/admin/AdminLogin";
 import VoucherManagement from "@/components/admin/VoucherManagement";
 import MemberManagement from "@/components/admin/MemberManagement";
 import Dashboard from "@/components/admin/Dashboard";
@@ -12,10 +11,23 @@ import { LayoutDashboard, Ticket, Users, Settings as SettingsIcon } from "lucide
 
 const Admin = () => {
   const [activeTab, setActiveTab] = useState("dashboard");
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+
+  const handleLogin = () => {
+    setIsAuthenticated(true);
+  };
+
+  const handleLogout = () => {
+    setIsAuthenticated(false);
+  };
+
+  if (!isAuthenticated) {
+    return <AdminLogin onLogin={handleLogin} />;
+  }
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <AdminHeader />
+      <AdminHeader onLogout={handleLogout} />
       
       <div className="container mx-auto px-4 py-6">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
