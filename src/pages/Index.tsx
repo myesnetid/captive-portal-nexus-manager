@@ -8,6 +8,12 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Wifi, Shield, Users, Ticket, Clock, ChevronLeft, ChevronRight, Phone, CreditCard } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { useSiteSettings, useBannerSettings } from "@/hooks/useSettings";
+import { apiService } from "@/services/api";
+import { APP_CONFIG } from "@/config/app";
+import { validateVoucherCode, validateUsername } from "@/utils/validators";
+import { formatCurrency, formatTime, formatDate, getClientIP } from "@/utils/helpers";
+import LoadingSpinner from "@/components/common/LoadingSpinner";
 
 const Index = () => {
   const [loginType, setLoginType] = useState<"voucher" | "member">("voucher");
@@ -16,7 +22,11 @@ const Index = () => {
   const [password, setPassword] = useState("");
   const [currentTime, setCurrentTime] = useState(new Date());
   const [currentBanner, setCurrentBanner] = useState(0);
+  const [isLoading, setIsLoading] = useState(false);
+  
   const { toast } = useToast();
+  const { settings, loading: settingsLoading } = useSiteSettings();
+  const { banners, loading: bannersLoading } = useBannerSettings();
 
   // Real-time clock
   useEffect(() => {
@@ -27,84 +37,116 @@ const Index = () => {
     return () => clearInterval(timer);
   }, []);
 
-  // Banner slider - this would normally come from settings
-  const banners = [
-    {
-      title: "STOP JUDI ONLINE",
-      subtitle: "Judi Online Merusak Masa Depan Anda",
-      bgColor: "bg-red-500",
-      type: "text"
-    },
-    {
-      title: "LINDUNGI KELUARGA",
-      subtitle: "Dari Bahaya Judi Online",
-      bgColor: "bg-orange-500",
-      type: "text"
-    },
-    {
-      title: "INTERNET SEHAT",
-      subtitle: "Untuk Kehidupan Yang Lebih Baik",
-      bgColor: "bg-green-500",
-      type: "text"
-    }
-  ];
-
+  // Banner slider
   useEffect(() => {
-    const bannerTimer = setInterval(() => {
-      setCurrentBanner((prev) => (prev + 1) % banners.length);
-    }, 3000);
+    if (banners.length > 1) {
+      const bannerTimer = setInterval(() => {
+        setCurrentBanner((prev) => (prev + 1) % banners.length);
+      }, 3000);
 
-    return () => clearInterval(bannerTimer);
+      return () => clearInterval(bannerTimer);
+    }
   }, [banners.length]);
 
-  const handleVoucherLogin = () => {
-    if (!voucherCode) {
+  // Update page title when settings change
+  useEffect(() => {
+    document.title = settings.pageTitle;
+  }, [settings.pageTitle]);
+
+  const handleVoucherLogin = async () => {
+    if (!validateVoucherCode(voucherCode)) {
       toast({
         title: "Error",
-        description: "Masukkan kode voucher",
+        description: "Kode voucher harus 5 karakter (huruf dan angka)",
         variant: "destructive"
       });
       return;
     }
     
-    toast({
-      title: "Login Berhasil",
-      description: `Voucher ${voucherCode} berhasil digunakan`,
-    });
+    setIsLoading(true);
+    
+    try {
+      const clientIP = await getClientIP();
+      const response = await apiService.voucherLogin({
+        code: voucherCode,
+        ipAddress: clientIP || undefined
+      });
+
+      if (response.success) {
+        toast({
+          title: "Login Berhasil",
+          description: `Voucher ${voucherCode} berhasil digunakan`,
+        });
+        // Redirect to success page or internet access
+      } else {
+        toast({
+          title: "Login Gagal",
+          description: response.error || "Kode voucher tidak valid",
+          variant: "destructive"
+        });
+      }
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Terjadi kesalahan sistem",
+        variant: "destructive"
+      });
+    } finally {
+      setIsLoading(false);
+    }
   };
 
-  const handleMemberLogin = () => {
-    if (!username || !password) {
+  const handleMemberLogin = async () => {
+    if (!validateUsername(username) || !password) {
       toast({
         title: "Error", 
-        description: "Masukkan username dan password",
+        description: "Masukkan username dan password yang valid",
         variant: "destructive"
       });
       return;
     }
 
-    toast({
-      title: "Login Berhasil",
-      description: `Selamat datang ${username}`,
-    });
+    setIsLoading(true);
+
+    try {
+      const clientIP = await getClientIP();
+      const response = await apiService.memberLogin({
+        username,
+        password,
+        ipAddress: clientIP || undefined
+      });
+
+      if (response.success) {
+        toast({
+          title: "Login Berhasil",
+          description: `Selamat datang ${username}`,
+        });
+        // Redirect to success page or internet access
+      } else {
+        toast({
+          title: "Login Gagal",
+          description: response.error || "Username atau password salah",
+          variant: "destructive"
+        });
+      }
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Terjadi kesalahan sistem",
+        variant: "destructive"
+      });
+    } finally {
+      setIsLoading(false);
+    }
   };
 
-  const formatTime = (date: Date) => {
-    return date.toLocaleTimeString('id-ID', {
-      hour: '2-digit',
-      minute: '2-digit',
-      second: '2-digit'
-    });
-  };
-
-  const formatDate = (date: Date) => {
-    return date.toLocaleDateString('id-ID', {
-      weekday: 'long',
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric'
-    });
-  };
+  if (settingsLoading || bannersLoading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 flex items-center justify-center">
+        <LoadingSpinner size="lg" text="Memuat aplikasi..." />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50">
@@ -117,8 +159,8 @@ const Index = () => {
                 <Wifi className="h-5 w-5 sm:h-6 sm:w-6 text-white" />
               </div>
               <div className="text-center sm:text-left">
-                <h1 className="text-lg sm:text-xl font-bold text-gray-900">Myesnet.id</h1>
-                <p className="text-xs sm:text-sm text-gray-500">Internet Provider Terpercaya</p>
+                <h1 className="text-lg sm:text-xl font-bold text-gray-900">{settings.siteName}</h1>
+                <p className="text-xs sm:text-sm text-gray-500">{settings.siteTitle}</p>
               </div>
             </div>
             <div className="flex items-center space-x-4">
@@ -140,34 +182,50 @@ const Index = () => {
       </div>
 
       {/* Banner Slider */}
-      <div className="relative h-20 sm:h-24 overflow-hidden bg-gradient-to-r from-red-500 to-orange-500">
-        {banners.map((banner, index) => (
-          <div
-            key={index}
-            className={`absolute inset-0 ${banner.bgColor} flex items-center justify-center text-white transition-transform duration-500 ease-in-out`}
-            style={{
-              transform: `translateX(${(index - currentBanner) * 100}%)`
-            }}
-          >
-            <div className="text-center px-4">
-              <h2 className="text-lg sm:text-2xl font-bold">{banner.title}</h2>
-              <p className="text-xs sm:text-sm opacity-90">{banner.subtitle}</p>
+      {banners.length > 0 && (
+        <div className="relative h-20 sm:h-24 overflow-hidden">
+          {banners.map((banner, index) => (
+            <div
+              key={banner.id}
+              className={`absolute inset-0 ${banner.bgColor || 'bg-gradient-to-r from-red-500 to-orange-500'} flex items-center justify-center text-white transition-transform duration-500 ease-in-out`}
+              style={{
+                transform: `translateX(${(index - currentBanner) * 100}%)`
+              }}
+            >
+              <div className="text-center px-4">
+                {banner.type === 'image' && banner.imageUrl ? (
+                  <img 
+                    src={banner.imageUrl} 
+                    alt={banner.title || "Banner"} 
+                    className="h-full w-auto max-h-20 sm:max-h-24 mx-auto object-contain"
+                  />
+                ) : (
+                  <>
+                    <h2 className="text-lg sm:text-2xl font-bold">{banner.title}</h2>
+                    <p className="text-xs sm:text-sm opacity-90">{banner.subtitle}</p>
+                  </>
+                )}
+              </div>
             </div>
-          </div>
-        ))}
-        <button
-          onClick={() => setCurrentBanner((prev) => (prev - 1 + banners.length) % banners.length)}
-          className="absolute left-2 sm:left-4 top-1/2 transform -translate-y-1/2 bg-white/20 hover:bg-white/30 rounded-full p-1"
-        >
-          <ChevronLeft className="h-3 w-3 sm:h-4 sm:w-4 text-white" />
-        </button>
-        <button
-          onClick={() => setCurrentBanner((prev) => (prev + 1) % banners.length)}
-          className="absolute right-2 sm:right-4 top-1/2 transform -translate-y-1/2 bg-white/20 hover:bg-white/30 rounded-full p-1"
-        >
-          <ChevronRight className="h-3 w-3 sm:h-4 sm:w-4 text-white" />
-        </button>
-      </div>
+          ))}
+          {banners.length > 1 && (
+            <>
+              <button
+                onClick={() => setCurrentBanner((prev) => (prev - 1 + banners.length) % banners.length)}
+                className="absolute left-2 sm:left-4 top-1/2 transform -translate-y-1/2 bg-white/20 hover:bg-white/30 rounded-full p-1"
+              >
+                <ChevronLeft className="h-3 w-3 sm:h-4 sm:w-4 text-white" />
+              </button>
+              <button
+                onClick={() => setCurrentBanner((prev) => (prev + 1) % banners.length)}
+                className="absolute right-2 sm:right-4 top-1/2 transform -translate-y-1/2 bg-white/20 hover:bg-white/30 rounded-full p-1"
+              >
+                <ChevronRight className="h-3 w-3 sm:h-4 sm:w-4 text-white" />
+              </button>
+            </>
+          )}
+        </div>
+      )}
 
       {/* Main Content - Single Column Layout */}
       <div className="container mx-auto px-4 py-6 sm:py-8">
@@ -178,7 +236,7 @@ const Index = () => {
               <CardTitle className="text-xl sm:text-2xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
                 Internet Access
               </CardTitle>
-              <p className="text-sm sm:text-base text-gray-600 mt-2">Pilih metode login untuk mengakses internet</p>
+              <p className="text-sm sm:text-base text-gray-600 mt-2">{settings.welcomeMessage}</p>
             </CardHeader>
 
             <CardContent>
@@ -204,6 +262,7 @@ const Index = () => {
                       onChange={(e) => setVoucherCode(e.target.value.toUpperCase())}
                       className="text-center text-lg font-mono tracking-wider"
                       maxLength={5}
+                      disabled={isLoading}
                     />
                     <p className="text-xs text-gray-500 text-center">
                       Format: 1j=1jam, 3j=3jam, 6j=6jam, 1h=1hari, 1m=1minggu
@@ -213,8 +272,9 @@ const Index = () => {
                     onClick={handleVoucherLogin}
                     className="w-full bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700"
                     size="lg"
+                    disabled={isLoading}
                   >
-                    Login dengan Voucher
+                    {isLoading ? <LoadingSpinner size="sm" /> : "Login dengan Voucher"}
                   </Button>
                 </TabsContent>
 
@@ -227,6 +287,7 @@ const Index = () => {
                         placeholder="Username member"
                         value={username}
                         onChange={(e) => setUsername(e.target.value)}
+                        disabled={isLoading}
                       />
                     </div>
                     <div className="space-y-2">
@@ -237,6 +298,7 @@ const Index = () => {
                         placeholder="Password member"
                         value={password}
                         onChange={(e) => setPassword(e.target.value)}
+                        disabled={isLoading}
                       />
                     </div>
                   </div>
@@ -244,8 +306,9 @@ const Index = () => {
                     onClick={handleMemberLogin}
                     className="w-full bg-gradient-to-r from-green-500 to-blue-600 hover:from-green-600 hover:to-blue-700"
                     size="lg"
+                    disabled={isLoading}
                   >
-                    Login Member
+                    {isLoading ? <LoadingSpinner size="sm" /> : "Login Member"}
                   </Button>
                 </TabsContent>
               </Tabs>
@@ -274,26 +337,12 @@ const Index = () => {
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-2">
-                <div className="flex justify-between items-center py-1">
-                  <span className="text-sm">1 Jam</span>
-                  <span className="font-semibold text-blue-700">Rp 2.000</span>
-                </div>
-                <div className="flex justify-between items-center py-1">
-                  <span className="text-sm">3 Jam</span>
-                  <span className="font-semibold text-blue-700">Rp 5.000</span>
-                </div>
-                <div className="flex justify-between items-center py-1">
-                  <span className="text-sm">6 Jam</span>
-                  <span className="font-semibold text-blue-700">Rp 8.000</span>
-                </div>
-                <div className="flex justify-between items-center py-1">
-                  <span className="text-sm">1 Hari</span>
-                  <span className="font-semibold text-blue-700">Rp 12.000</span>
-                </div>
-                <div className="flex justify-between items-center py-1">
-                  <span className="text-sm">1 Minggu</span>
-                  <span className="font-semibold text-blue-700">Rp 25.000</span>
-                </div>
+                {APP_CONFIG.voucherTypes.map((voucher) => (
+                  <div key={voucher.id} className="flex justify-between items-center py-1">
+                    <span className="text-sm">{voucher.name}</span>
+                    <span className="font-semibold text-blue-700">{formatCurrency(voucher.price)}</span>
+                  </div>
+                ))}
               </CardContent>
             </Card>
 
@@ -306,27 +355,15 @@ const Index = () => {
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-3">
-                <div className="space-y-2">
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm font-medium">Basic (10 Mbps)</span>
-                    <span className="font-bold text-green-700">Rp 150.000</span>
+                {APP_CONFIG.memberPackages.map((pkg) => (
+                  <div key={pkg.id} className="space-y-2">
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm font-medium">{pkg.name} ({pkg.speed})</span>
+                      <span className="font-bold text-green-700">{formatCurrency(pkg.price)}</span>
+                    </div>
+                    <p className="text-xs text-green-600">Unlimited, {pkg.devices} Device</p>
                   </div>
-                  <p className="text-xs text-green-600">Unlimited, 2 Device</p>
-                </div>
-                <div className="space-y-2">
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm font-medium">Standard (20 Mbps)</span>
-                    <span className="font-bold text-green-700">Rp 250.000</span>
-                  </div>
-                  <p className="text-xs text-green-600">Unlimited, 4 Device</p>
-                </div>
-                <div className="space-y-2">
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm font-medium">Premium (50 Mbps)</span>
-                    <span className="font-bold text-green-700">Rp 400.000</span>
-                  </div>
-                  <p className="text-xs text-green-600">Unlimited, 6 Device</p>
-                </div>
+                ))}
                 <div className="pt-2 text-center">
                   <p className="text-xs text-green-600">Jatuh tempo tgl 15 setiap bulan</p>
                 </div>
@@ -346,11 +383,11 @@ const Index = () => {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <p className="text-sm font-medium text-purple-800">WhatsApp</p>
-                  <p className="text-sm text-purple-700">+62 812-3456-7890</p>
+                  <p className="text-sm text-purple-700">{settings.contactPhone}</p>
                 </div>
                 <div className="space-y-2">
                   <p className="text-sm font-medium text-purple-800">Alamat</p>
-                  <p className="text-sm text-purple-700">Jl. Internet Sehat No. 123<br />Kota Digital</p>
+                  <p className="text-sm text-purple-700 whitespace-pre-line">{settings.contactAddress}</p>
                 </div>
               </div>
               <div className="space-y-2">
